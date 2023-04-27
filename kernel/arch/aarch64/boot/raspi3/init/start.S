@@ -40,7 +40,7 @@ primary:
 	/* bl instruction is used to call the subroutine and the return address is stored in the Link Register */
 	bl 	arm64_elX_to_el1
 
-	/* Prepare stack pointer and jump to C. */
+	/* Prepare stack pointer and jump to C. !!IMPORTANT!! */
 	ldr 	x0, =boot_cpu_stack
 	add 	x0, x0, #INIT_STACK_SIZE
 	mov 	sp, x0
