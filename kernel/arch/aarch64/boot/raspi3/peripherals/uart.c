@@ -74,6 +74,7 @@ static void early_uart_send(unsigned int c)
         early_put32(AUX_MU_IO_REG, c);
 }
 
+// #include <string.h> cannot be supported
 size_t strlen(const char * str)
 {
         size_t len = 0;
@@ -96,6 +97,3 @@ void uart_send_string(char *str)
 
         /* LAB 1 TODO 3 END */
 }
-
-// 1. why size_t matters?
-// 2. include <string.h> is unsuccessful, why?

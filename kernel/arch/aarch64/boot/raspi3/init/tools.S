@@ -259,6 +259,9 @@ BEGIN_FUNC(el1_mmu_activate)
 	/* Enable MMU */
 	/* LAB 1 TODO 4 BEGIN */
 
+	// enable MMU by setting field "M"
+	orr     x8, x8, #SCTLR_EL1_M
+
 	/* LAB 1 TODO 4 END */
 	/* Disable alignment checking */
 	bic     x8, x8, #SCTLR_EL1_A
