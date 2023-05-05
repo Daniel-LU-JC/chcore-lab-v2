@@ -265,10 +265,10 @@ u64 get_free_mem_size_from_buddy(struct phys_mem_pool *pool)
                 total_size += list->nr_free * current_order_size;
 
                 /* debug : print info about current order */
-                kdebug("buddy memory chunk order: %d, size: 0x%lx, num: %d\n",
-                       order,
-                       current_order_size,
-                       list->nr_free);
+                // kdebug("buddy memory chunk order: %d, size: 0x%lx, num: %d\n",
+                //        order,
+                //        current_order_size,
+                //        list->nr_free);
         }
         return total_size;
 }
@@ -358,6 +358,7 @@ void lab2_test_buddy(void)
                 bool ok = true;
                 u64 expect_free_mem = pool->pool_phys_page_num * PAGE_SIZE;
                 struct page *page;
+                int monitor = 1;
                 for (int i = 0; i < pool->pool_phys_page_num; i++) {
                         page = buddy_get_pages(pool, 0);
                         BUG_ON(page == NULL);
@@ -365,9 +366,14 @@ void lab2_test_buddy(void)
                         expect_free_mem -= PAGE_SIZE;
                         lab_assert(get_free_mem_size_from_buddy(pool)
                                    == expect_free_mem);
+                        if (i > (pool->pool_phys_page_num / 10) * monitor) {
+                                printk("[PROGRESS] page number: %d / 10\n", monitor);
+                                monitor++;
+                        }
                 }
                 lab_assert(get_free_mem_size_from_buddy(pool) == 0);
                 lab_assert(buddy_get_pages(pool, 0) == NULL);
+                monitor = 1;
                 for (int i = 0; i < pool->pool_phys_page_num; i++) {
                         page = pool->page_metadata + i;
                         lab_assert(page->allocated);
@@ -375,6 +381,10 @@ void lab2_test_buddy(void)
                         expect_free_mem += PAGE_SIZE;
                         lab_assert(get_free_mem_size_from_buddy(pool)
                                    == expect_free_mem);
+                        if (i > (pool->pool_phys_page_num / 10) * monitor) {
+                                printk("[PROGRESS] page number: %d / 10\n", monitor);
+                                monitor++;
+                        }
                 }
                 lab_assert(pool->pool_phys_page_num * PAGE_SIZE
                            == expect_free_mem);
