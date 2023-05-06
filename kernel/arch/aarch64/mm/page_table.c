@@ -152,7 +152,7 @@ static int get_next_ptp(ptp_t *cur_ptp, u32 level, vaddr_t va, ptp_t **next_ptp,
         }
 
         *next_ptp = (ptp_t *)GET_NEXT_PTP(entry);
-        *pte = entry;
+        *pte = entry;  // an example of how ** pointer should be used
         if (IS_PTE_TABLE(entry->pte))
                 return NORMAL_PTP;
         else
@@ -262,7 +262,10 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         if (IS_PTE_INVALID(l3_pte->pte))
                 return -ENOMAPPING;
         BUG_ON(!IS_PTE_TABLE(l3_pte->pte));  // the physical address has been found
-        entry = &l3_pte;
+        
+        // 'entry = &l3_pte;' is totally different from '*entry = l3_pte;'
+        *entry = l3_pte;
+        
         *pa = (l3_pte->table.next_table_addr << PAGE_SHIFT) | GET_VA_OFFSET_L3(va);
 
         return 0;
@@ -309,9 +312,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 // store the pa into the entry at level 3
                 l3_pte = &l3_ptp->ent[GET_L3_INDEX(va_page)];
                 set_pte_flags(l3_pte, flags, USER_PTE);
-                kdebug("l3_pte->l3_page.SH: %d\n", l3_pte->l3_page.SH);
                 l3_pte->l3_page.is_valid = l3_pte->l3_page.is_page = 1;
-                kdebug("l3_pte->l3_page.SH: %d\n", l3_pte->l3_page.SH);  // fix bug
 
                 l3_pte->table.next_table_addr = pa_page >> PAGE_SHIFT;
 
