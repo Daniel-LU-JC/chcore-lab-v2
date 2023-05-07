@@ -226,10 +226,8 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         pte_t *l0_pte, *l1_pte, *l2_pte, *l3_pte;
         ptp_t *l0_ptp, *l1_ptp, *l2_ptp, *l3_ptp;
 
-        if (pgtbl == NULL) {
-                kwarn("%s: input arg is NULL.\n", __func__);
-                return;
-        }
+        if (pgtbl == NULL)
+                BUG("pgtbl == NULL\n");
 
         l0_ptp = (ptp_t *)pgtbl;
 
@@ -245,7 +243,9 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
                 return -ENOMAPPING;
         } else if (ptp_type == BLOCK_PTP) {
                 // prepare pa, entry and @return
-
+                *entry = l1_pte;
+                *pa = (l1_pte->l1_block.pfn << L1_INDEX_SHIFT) | GET_VA_OFFSET_L1(va);
+                return 0;
         }
 
         // from level 2 to level 3, huge page with size 2MB
@@ -254,7 +254,9 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
                 return -ENOMAPPING;
         } else if (ptp_type == BLOCK_PTP) {
                 // prepare pa, entry and @return
-
+                *entry = l2_pte;
+                *pa = (l2_pte->l2_block.pfn << L2_INDEX_SHIFT) | GET_VA_OFFSET_L2(va);
+                return 0;
         }
 
         // at level 3, translate va into pa with 4KB page size
@@ -288,10 +290,8 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
         pte_t *l0_pte, *l1_pte, *l2_pte, *l3_pte;
         ptp_t *l0_ptp, *l1_ptp, *l2_ptp, *l3_ptp;
 
-        if (pgtbl == NULL) {
-                kwarn("%s: input arg is NULL.\n", __func__);
-                return;
-        }
+        if (pgtbl == NULL)
+                BUG("pgtbl == NULL\n");
 
         l0_ptp = (ptp_t *)pgtbl;
 
@@ -335,13 +335,96 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
          * unmapped.
          */
 
+        pte_t *l0_pte, *l1_pte, *l2_pte, *l3_pte;
+        ptp_t *l0_ptp, *l1_ptp, *l2_ptp, *l3_ptp;
+
+        if (pgtbl == NULL)
+                BUG("pgtbl == NULL\n");
+
+        l0_ptp = (ptp_t *)pgtbl;
+
+        int page_number = len / PAGE_SIZE;  // 'for' loop, without huge page support
+        vaddr_t va_page = va & PAGE_NUMBER_MASK;  // starting page for unmapping
+
+        for (int i = 0; i < page_number; ++i) {
+                int ptp_type = get_next_ptp(l0_ptp, 0, va_page, &l1_ptp, &l0_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                ptp_type = get_next_ptp(l1_ptp, 1, va_page, &l2_ptp, &l1_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                ptp_type = get_next_ptp(l2_ptp, 2, va_page, &l3_ptp, &l2_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                l3_pte = &l3_ptp->ent[GET_L3_INDEX(va_page)];  // find the target page table entry
+                BUG_ON(l3_pte->l3_page.is_valid == 0);
+                l3_pte->l3_page.is_valid = 0;
+                va_page += PAGE_SIZE;
+        }
+
+        return 0;
+
         /* LAB 2 TODO 3 END */
 }
 
+#define HUGE_PAGE_ALIGNMENT_MASK (0xffffffffc0000000)
 int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                             vmr_prop_t flags)
 {
         /* LAB 2 TODO 4 BEGIN */
+
+        int level_one_huge_page_num = len >> L1_INDEX_SHIFT;
+        int level_two_huge_page_num = (len - level_one_huge_page_num * L1_HUGE_PAGE_SIZE) >> L2_INDEX_SHIFT;
+        int level_three_normal_page_num = (len - level_one_huge_page_num * L1_HUGE_PAGE_SIZE - level_two_huge_page_num * L2_HUGE_PAGE_SIZE) >> L3_INDEX_SHIFT;
+
+        kdebug("1GB: %d 2MB: %d 4KB: %d\n", level_one_huge_page_num, level_two_huge_page_num, level_three_normal_page_num);
+
+        pte_t *l0_pte, *l1_pte, *l2_pte, *l3_pte;
+        ptp_t *l0_ptp, *l1_ptp, *l2_ptp, *l3_ptp;
+
+        if (pgtbl == NULL)
+                BUG("pgtbl == NULL\n");
+
+        l0_ptp = (ptp_t *)pgtbl;
+
+        // allocate 1GB, then 2MB, finally 4KB
+        // alignment should be checked at the very beginning for merely once
+        vaddr_t va_page = va & HUGE_PAGE_ALIGNMENT_MASK;
+        vaddr_t pa_page = pa & HUGE_PAGE_ALIGNMENT_MASK;
+
+        for (int i = 0; i < level_one_huge_page_num; ++i) {
+                int ptp_type = get_next_ptp(l0_ptp, 0, va_page, &l1_ptp, &l0_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                // level 1 pte points to 1GB huge page
+                l1_pte = &l1_ptp->ent[GET_L1_INDEX(va_page)];
+                set_pte_flags(l1_pte, flags, USER_PTE);
+                l1_pte->table.is_valid = 1;
+                l1_pte->table.is_table = 0;
+
+                l1_pte->l1_block.pfn = pa_page >> L1_INDEX_SHIFT;
+
+                va_page += L1_HUGE_PAGE_SIZE;
+                pa_page += L1_HUGE_PAGE_SIZE;
+        }
+
+        for (int i = 0; i < level_two_huge_page_num; ++i) {
+                int ptp_type = get_next_ptp(l0_ptp, 0, va_page, &l1_ptp, &l0_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                ptp_type = get_next_ptp(l1_ptp, 1, va_page, &l2_ptp, &l1_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                // level 2 pte points to 2MB huge page
+                l2_pte = &l2_ptp->ent[GET_L2_INDEX(va_page)];
+                set_pte_flags(l2_pte, flags, USER_PTE);
+                l2_pte->table.is_valid = 1;
+                l2_pte->table.is_table = 0;
+
+                l2_pte->l2_block.pfn = pa_page >> L2_INDEX_SHIFT;
+
+                va_page += L2_HUGE_PAGE_SIZE;
+                pa_page += L2_HUGE_PAGE_SIZE;
+        }
+
+        // invoke existing func to map 4KB pages
+        map_range_in_pgtbl(pgtbl, va_page, pa_page, PAGE_SIZE * level_three_normal_page_num, flags);
+
+        return 0;
 
         /* LAB 2 TODO 4 END */
 }
