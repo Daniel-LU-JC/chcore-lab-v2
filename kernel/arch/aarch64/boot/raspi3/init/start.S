@@ -18,18 +18,29 @@
 .extern init_c
 
 BEGIN_FUNC(_start)
+
+	/* mrs: move system register to general-purpose register */
+	/* mpidr_el1: in a multiprocessor system, provides an additional PE identification mechanism */
 	mrs	x8, mpidr_el1
+
+	/* x8 = x8 & #0xFF */
 	and	x8, x8,	#0xFF
+
+	/* cbz: compare (the value in the register x8) and branch (to label primary) on zero */
+	/* branching indicates that the PE identifier is zero for the current core */
 	cbz	x8, primary
 
 	/* hang all secondary processors before we introduce smp */
+	/* b is the unconditional branch instruction and . is a shorthand notation for the current PC value */
+	/* effectively creating an infinite loop */
 	b 	.
 
 primary:
 	/* Turn to el1 from other exception levels. */
+	/* bl instruction is used to call the subroutine and the return address is stored in the Link Register */
 	bl 	arm64_elX_to_el1
 
-	/* Prepare stack pointer and jump to C. */
+	/* Prepare stack pointer and jump to C. !!IMPORTANT!! */
 	ldr 	x0, =boot_cpu_stack
 	add 	x0, x0, #INIT_STACK_SIZE
 	mov 	sp, x0

@@ -18,6 +18,9 @@
 
 #define ALIGN(n) __attribute__((__aligned__(n)))
 
+#define max(a, b) ((a) >= (b) ? (a) : (b))
+#define min(a, b) ((a) <= (b) ? (a) : (b))
+
 #define ROUND_UP(x, n)     (((x) + (n)-1) & ~((n)-1))
 #define ROUND_DOWN(x, n)   ((x) & ~((n)-1))
 #define DIV_ROUND_UP(n, d) (((n) + (d)-1) / (d))

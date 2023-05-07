@@ -74,9 +74,26 @@ static void early_uart_send(unsigned int c)
         early_put32(AUX_MU_IO_REG, c);
 }
 
+// #include <string.h> cannot be supported
+size_t strlen(const char * str)
+{
+        size_t len = 0;
+
+        while (* str != '\0') {
+                len++;
+                str++;
+        }
+
+        return len;
+}
+
 void uart_send_string(char *str)
 {
         /* LAB 1 TODO 3 BEGIN */
+
+        int length = strlen(str);
+        for (int i = 0; i < length; ++i)
+                early_uart_send(str[i]);
 
         /* LAB 1 TODO 3 END */
 }
