@@ -244,7 +244,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         } else if (ptp_type == BLOCK_PTP) {
                 // prepare pa, entry and @return
                 *entry = l1_pte;
-                *pa = (l1_pte->l1_block.pfn << L1_INDEX_SHIFT) | GET_VA_OFFSET_L1(va);
+                *pa = ((paddr_t) l1_pte->l1_block.pfn << L1_INDEX_SHIFT) | GET_VA_OFFSET_L1(va);
                 return 0;
         }
 
@@ -255,7 +255,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         } else if (ptp_type == BLOCK_PTP) {
                 // prepare pa, entry and @return
                 *entry = l2_pte;
-                *pa = (l2_pte->l2_block.pfn << L2_INDEX_SHIFT) | GET_VA_OFFSET_L2(va);
+                *pa = ((paddr_t) l2_pte->l2_block.pfn << L2_INDEX_SHIFT) | GET_VA_OFFSET_L2(va);
                 return 0;
         }
 
@@ -268,7 +268,7 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
         // 'entry = &l3_pte;' is totally different from '*entry = l3_pte;'
         *entry = l3_pte;
         
-        *pa = (l3_pte->table.next_table_addr << PAGE_SHIFT) | GET_VA_OFFSET_L3(va);
+        *pa = ((paddr_t) l3_pte->table.next_table_addr << PAGE_SHIFT) | GET_VA_OFFSET_L3(va);
 
         return 0;
 
@@ -432,6 +432,44 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
 {
         /* LAB 2 TODO 4 BEGIN */
+
+        pte_t *l0_pte, *l1_pte, *l2_pte, *l3_pte;
+        ptp_t *l0_ptp, *l1_ptp, *l2_ptp, *l3_ptp;
+
+        if (pgtbl == NULL)
+                BUG("pgtbl == NULL\n");
+
+        l0_ptp = (ptp_t *)pgtbl;
+
+        int level_one_huge_page_num = len >> L1_INDEX_SHIFT;
+        int level_two_huge_page_num = (len - level_one_huge_page_num * L1_HUGE_PAGE_SIZE) >> L2_INDEX_SHIFT;
+        int level_three_normal_page_num = (len - level_one_huge_page_num * L1_HUGE_PAGE_SIZE - level_two_huge_page_num * L2_HUGE_PAGE_SIZE) >> L3_INDEX_SHIFT;
+
+        vaddr_t va_page = va & HUGE_PAGE_ALIGNMENT_MASK;
+
+        for (int i = 0; i < level_one_huge_page_num; ++i) {
+                int ptp_type = get_next_ptp(l0_ptp, 0, va_page, &l1_ptp, &l0_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                l1_pte = &l1_ptp->ent[GET_L1_INDEX(va_page)];
+                BUG_ON(l1_pte->l1_block.is_valid == 0);
+                l1_pte->l1_block.is_valid = 0;
+                va_page += L1_HUGE_PAGE_SIZE;
+        }
+
+        for (int i = 0; i < level_two_huge_page_num; ++i) {
+                int ptp_type = get_next_ptp(l0_ptp, 0, va_page, &l1_ptp, &l0_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                ptp_type = get_next_ptp(l1_ptp, 1, va_page, &l2_ptp, &l1_pte, true);
+                BUG_ON(ptp_type != NORMAL_PTP);
+                l2_pte = &l2_ptp->ent[GET_L2_INDEX(va_page)];
+                BUG_ON(l2_pte->l2_block.is_valid == 0);
+                l2_pte->l2_block.is_valid = 0;
+                va_page += L2_HUGE_PAGE_SIZE;
+        }
+
+        unmap_range_in_pgtbl(pgtbl, va_page, PAGE_SIZE * level_three_normal_page_num);
+
+        return 0;
 
         /* LAB 2 TODO 4 END */
 }
