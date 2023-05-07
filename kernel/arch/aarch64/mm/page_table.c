@@ -452,6 +452,7 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 BUG_ON(ptp_type != NORMAL_PTP);
                 l1_pte = &l1_ptp->ent[GET_L1_INDEX(va_page)];
                 BUG_ON(l1_pte->l1_block.is_valid == 0);
+                BUG_ON(l1_pte->table.is_table == 1);  // huge page is not a table descriptor
                 l1_pte->l1_block.is_valid = 0;
                 va_page += L1_HUGE_PAGE_SIZE;
         }
@@ -463,6 +464,7 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 BUG_ON(ptp_type != NORMAL_PTP);
                 l2_pte = &l2_ptp->ent[GET_L2_INDEX(va_page)];
                 BUG_ON(l2_pte->l2_block.is_valid == 0);
+                BUG_ON(l2_pte->table.is_table == 1);  // huge page is not a table descriptor
                 l2_pte->l2_block.is_valid = 0;
                 va_page += L2_HUGE_PAGE_SIZE;
         }
