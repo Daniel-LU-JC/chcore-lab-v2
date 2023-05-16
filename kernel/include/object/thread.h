@@ -25,9 +25,13 @@ extern struct thread *current_threads[PLAT_CPU_NUM];
 #define THREAD_ITSELF ((void *)(-1))
 
 struct thread {
-        struct list_head node; // link threads in a same cap_group
+
+        // link threads in the same cap_group (process)
+        struct list_head node;
+
         struct list_head ready_queue_node; // link threads in a ready queue
         struct list_head sem_queue_node; // <lab4> sem use
+
         struct thread_ctx *thread_ctx; // thread control block
 
         /*
@@ -43,6 +47,8 @@ struct thread {
          * vmspace is also stored in the 2nd slot of capability
          */
         struct vmspace *vmspace;
+
+        // the process that current threads belongs to
         struct cap_group *cap_group;
 
         /*

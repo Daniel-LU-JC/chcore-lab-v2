@@ -32,12 +32,15 @@ static bool is_valid_slot_id(struct slot_table *slot_table, int slot_id)
         return true;
 }
 
+// @param size: the number of object_slots to be allocated
 static int slot_table_init(struct slot_table *slot_table, unsigned int size)
 {
         int r;
 
         size = DIV_ROUND_UP(size, BASE_OBJECT_NUM) * BASE_OBJECT_NUM;
         slot_table->slots_size = size;
+
+        // **slots means that each element in the array slots[i] is a pointer to object_slot
         slot_table->slots = kzalloc(size * sizeof(*slot_table->slots));
         if (!slot_table->slots) {
                 r = -ENOMEM;
@@ -67,10 +70,20 @@ out_fail:
         return r;
 }
 
+// @param size: size of object_slot array, which is supposed to be n * BASE_OBJECT_NUM
 int cap_group_init(struct cap_group *cap_group, unsigned int size, u64 pid)
 {
         struct slot_table *slot_table = &cap_group->slot_table;
         /* LAB 3 TODO BEGIN */
+
+        // initialize the slot table
+        BUG_ON(slot_table_init(slot_table, size) != 0);
+        // initialize the thread-related fields
+        init_list_head(&cap_group->thread_list);
+        cap_group->thread_cnt = 0;
+        // global identifier pid
+        cap_group->pid = pid;
+        // cap_group_name is set at the end of create_root_cap_group routine
 
         /* LAB 3 TODO END */
         return 0;
@@ -232,6 +245,7 @@ int sys_create_cap_group(u64 pid, u64 cap_group_name, u64 name_len, u64 pcid)
         /* LAB 3 TODO BEGIN */
         /* cap current cap_group */
 
+        new_cap_group = obj_alloc(TYPE_CAP_GROUP, sizeof(struct cap_group));
 
         /* LAB 3 TODO END */
 
@@ -241,8 +255,11 @@ int sys_create_cap_group(u64 pid, u64 cap_group_name, u64 name_len, u64 pcid)
         }
         /* LAB 3 TODO BEGIN */
 
+        cap_group_init(new_cap_group, BASE_OBJECT_NUM, pid);
+
         /* LAB 3 TODO END */
 
+        // new_cap_group has been recorded into ROOT_PID's slot table
         cap = cap_alloc(current_cap_group, new_cap_group, 0);
         if (cap < 0) {
                 r = cap;
@@ -259,6 +276,8 @@ int sys_create_cap_group(u64 pid, u64 cap_group_name, u64 name_len, u64 pcid)
 
         /* 2st cap is vmspace */
         /* LAB 3 TODO BEGIN */
+
+        vmspace = obj_alloc(TYPE_VMSPACE, sizeof(struct vmspace));
 
         /* LAB 3 TODO END */
         if (!vmspace) {
@@ -304,19 +323,32 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
         int slot_id;
         /* LAB 3 TODO BEGIN */
 
+        cap_group = obj_alloc(TYPE_CAP_GROUP, sizeof(struct cap_group));
+        // BASE_OBJECT_NUM is the initial size of the object_slot array
+        cap_group_init(cap_group, BASE_OBJECT_NUM, ROOT_PID);
+
         /* LAB 3 TODO END */
         BUG_ON(!cap_group);
         /* LAB 3 TODO BEGIN */
 
+        slot_id = cap_alloc(cap_group, cap_group, 0);
+
         /* LAB 3 TODO END */
         BUG_ON(slot_id != CAP_GROUP_OBJ_ID);
         /* LAB 3 TODO BEGIN */
+
+        vmspace = obj_alloc(TYPE_VMSPACE, sizeof(struct vmspace));
 
         /* LAB 3 TODO END */
         BUG_ON(!vmspace);
 
         /* fixed PCID 1 for root process, PCID 0 is not used. */
         /* LAB 3 TODO BEGIN */
+
+        // PCID: process context identification set for TLB flushing
+        vmspace->pcid = ROOT_PCID;
+        vmspace_init(vmspace);
+        slot_id = cap_alloc(cap_group, vmspace, 0);
 
         /* LAB 3 TODO END */
         BUG_ON(slot_id != VMSPACE_OBJ_ID);
