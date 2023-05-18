@@ -101,6 +101,17 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
                 goto out_fail;
         }
 
+        // examine all the capabilities of current process
+        int slots_num = cap_group->slot_table.slots_size;
+        struct slot_table *slot_table = &cap_group->slot_table;
+        for (int i = 0; i < slots_num; ++i) {
+                struct object_slot *slot = get_slot(cap_group, i);
+                if (!slot)
+                        continue;
+                BUG_ON(slot->isvalid != true);
+                printk("slot_id: %d type: %d\n", i, slot_table->slots[i]->object->type);
+        }
+
         /* load each segment in the elf binary */
         for (i = 0; i < elf->header.e_phnum; ++i) {
                 pmo_cap[i] = -1;
@@ -108,6 +119,35 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
                         seg_sz = elf->p_headers[i].p_memsz;
                         p_vaddr = elf->p_headers[i].p_vaddr;
                         /* LAB 3 TODO BEGIN */
+
+                        // @field p_offset: offset of the segment in the file image;
+                        //                  (void *)bin + elf->p_headers[i].p_offset is the address of the segment
+                        // @field p_filesz: size of the segment in the file image(in bytes)
+                        // @field p_vaddr: virtual address of the segment in memory (alignment)
+                        // @field p_memsz: size of the segment in memory (alignment)
+
+                        u64 mem_vaddr_start = p_vaddr, mem_vaddr_end = p_vaddr + seg_sz;
+                        u64 mem_alloc_start = ROUND_DOWN(mem_vaddr_start, PAGE_SIZE);
+                        u64 mem_alloc_end = ROUND_UP(mem_vaddr_end, PAGE_SIZE);
+                        size_t alloc_sz = mem_alloc_end - mem_alloc_start;
+
+                        // the return value of func create_pmo is the slot_id of current pmo in cap_group
+                        pmo_cap[i] = create_pmo(alloc_sz, PMO_DATA, cap_group, &pmo);
+                        if (pmo_cap[i] < 0) {
+                                r = -ENOMEM;
+                                goto out_free_cap;
+                        }
+
+                        // copy the content of current segment into the pmo that has just been created
+                        vaddr_t pmo_vaddr_start = phys_to_virt(pmo->start);  // target
+                        pmo_vaddr_start += (mem_vaddr_start - mem_alloc_start);  // there is an offset due to alignment
+                        memcpy((void *)pmo_vaddr_start, (void *)bin + elf->p_headers[i].p_offset, elf->p_headers[i].p_filesz);
+
+                        ret = vmspace_map_range(vmspace, 
+                                                mem_alloc_start, 
+                                                alloc_sz, 
+                                                PFLAGS2VMRFLAGS(elf->p_headers[i].p_flags), 
+                                                pmo);
 
                         /* LAB 3 TODO END */
                         BUG_ON(ret != 0);
