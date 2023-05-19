@@ -43,7 +43,10 @@ void *obj_alloc(u64 type, u64 size)
         u64 total_size;
         struct object *object;
 
+        // sizeof(struct object): stores the meta data of the object
+        // size: stores the real object
         total_size = sizeof(*object) + size;
+
         object = kzalloc(total_size);
         if (!object)
                 return NULL;
@@ -58,7 +61,7 @@ void *obj_alloc(u64 type, u64 size)
          */
         init_list_head(&object->copies_head);
 
-        return object->opaque;
+        return object->opaque;  // this is the address of real object
 }
 
 /*
@@ -77,6 +80,7 @@ void obj_free(void *obj)
         kfree(object);
 }
 
+// the usage of 'rights'(the third parameter) hasn't been clarified
 int cap_alloc(struct cap_group *cap_group, void *obj, u64 rights)
 {
         struct object *object;

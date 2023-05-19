@@ -48,10 +48,17 @@ struct slot_table {
 
 #define MAX_GROUP_NAME_LEN 63
 
+// one capability group stands for one process
 struct cap_group {
+
+        // the array of all the kernel objects that can be accessed by the current process
+        // the capability number of a kernel object is its index in the array
         struct slot_table slot_table;
+
+        // all the threads possessed by the current process
         struct list_head thread_list;
-        /* The number of threads */
+
+        // the number of threads
         int thread_cnt;
 
         /*
@@ -61,7 +68,7 @@ struct cap_group {
          */
         u64 pid;
 
-        /* Now is used for debugging */
+        /* Now is used for debugging, which is the name of the process */
         char cap_group_name[MAX_GROUP_NAME_LEN + 1];
 };
 

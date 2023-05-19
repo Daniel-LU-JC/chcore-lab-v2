@@ -555,6 +555,9 @@ int pmo_init(struct pmobject *pmo, pmo_type_t type, size_t len, paddr_t paddr)
                 /*
                  * For PMO_ANONYM (e.g., stack and heap) or PMO_SHM,
                  * we do not allocate the physical memory at once.
+                 * 
+                 * However, a new radix node should still be allocated,
+                 * which is a member of PMO object.
                  */
                 pmo->radix = new_radix();
                 init_radix(pmo->radix);

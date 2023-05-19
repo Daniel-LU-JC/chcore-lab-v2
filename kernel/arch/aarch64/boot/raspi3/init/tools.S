@@ -58,6 +58,8 @@
 BEGIN_FUNC(arm64_elX_to_el1)
 	/* LAB 1 TODO 1 BEGIN */
 
+	mrs x9, CurrentEL  /* which can be checked by using GDB */
+
 	/* LAB 1 TODO 1 END */
 
 	// Check the current exception level.
@@ -75,6 +77,11 @@ BEGIN_FUNC(arm64_elX_to_el1)
 
 	// Set the return address and exception level.
 	/* LAB 1 TODO 2 BEGIN */
+
+	adr x9, .Ltarget
+	msr elr_el3, x9
+	mov x9, SPSR_ELX_DAIF | SPSR_ELX_EL1H
+	msr spsr_el3, x9
 
 	/* LAB 1 TODO 2 END */
 
@@ -123,6 +130,8 @@ BEGIN_FUNC(arm64_elX_to_el1)
 
 	isb
 	eret
+
+	/* eret returns from an exception handling routine while ret returns from a normal function call */
 
 .Ltarget:
 	ret
@@ -249,6 +258,9 @@ BEGIN_FUNC(el1_mmu_activate)
 	mrs     x8, sctlr_el1
 	/* Enable MMU */
 	/* LAB 1 TODO 4 BEGIN */
+
+	// enable MMU by setting field "M"
+	orr     x8, x8, #SCTLR_EL1_M
 
 	/* LAB 1 TODO 4 END */
 	/* Disable alignment checking */
