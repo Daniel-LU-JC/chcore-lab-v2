@@ -15,6 +15,7 @@
 
 /* Functions of IRQ */
 
+/* set_exception_vector: write the address of EL1 exception vector table into vbar_el1 register */
 BEGIN_FUNC(set_exception_vector)
 	adr	x0, el1_vector
 	msr	vbar_el1, x0
