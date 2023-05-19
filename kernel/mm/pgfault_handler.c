@@ -36,6 +36,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
         int ret = 0;
 
         vmr = find_vmr_for_va(vmspace, fault_addr);
+        // no corresponding vmr means such address is illegal
         if (vmr == NULL) {
                 printk("handle_trans_fault: no vmr found for va 0x%lx!\n",
                        fault_addr);
@@ -68,11 +69,23 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                 fault_addr = ROUND_DOWN(fault_addr, PAGE_SIZE);
                 /* LAB 3 TODO BEGIN */
 
+                pa = get_page_from_pmo(pmo, index);
+
                 /* LAB 3 TODO END */
                 if (pa == 0) {
                         /* Not committed before. Then, allocate the physical
                          * page. */
                         /* LAB 3 TODO BEGIN */
+
+                        void *page = get_pages(0);
+                        BUG_ON(page == 0);
+                        pa = virt_to_phys(page);
+                        commit_page_to_pmo(pmo, index, pa);
+                        
+                        ret = map_range_in_pgtbl(vmspace->pgtbl, ROUND_DOWN(fault_addr, PAGE_SIZE), 
+                                                 pa, PAGE_SIZE, perm);
+                        if (ret < 0)
+                                return -ENOMAPPING;
 
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
@@ -101,6 +114,11 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                          * Repeated mapping operations are harmless.
                          */
                         /* LAB 3 TODO BEGIN */
+
+                        ret = map_range_in_pgtbl(vmspace->pgtbl, ROUND_DOWN(fault_addr, PAGE_SIZE), 
+                                                 pa, PAGE_SIZE, perm);
+                        if (ret < 0)
+                                return -ENOMAPPING;
 
                         /* LAB 3 TODO END */
 #ifdef CHCORE_LAB3_TEST
